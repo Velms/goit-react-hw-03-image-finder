@@ -1,4 +1,4 @@
-@import-normalize; /* bring in normalize.css styles */
+@import 'modern-normalize/modern-normalize.css';
 
 body {
   margin: 0;
@@ -9,19 +9,20 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-code {
-  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
-    monospace;
+html {
+  box-sizing: border-box;
+  width: 100vw;
+  overflow-x: hidden;
 }
 
-li {
-  list-style: none;
+*,
+*::before,
+*::after {
+  box-sizing: inherit;
 }
 
-input {
-  outline: none;
-}
-
-button:hover {
-  box-shadow: 2px 3px 5px rgb(11, 102, 187);
+img {
+  display: block;
+  max-width: 100%;
+  height: auto;
 }

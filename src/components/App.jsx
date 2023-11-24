@@ -1,94 +1,131 @@
-import React, { Component } from 'react';
-import shortid from 'shortid';
-import s from './App.module.css';
-import ContactList from './ContactList/ContactList';
-import ContactForm from './ContactForm';
-import Filter from './Filter';
+import { Component } from 'react';
+import axios from 'axios';
+import PropTypes from 'prop-types';
+import { ToastContainer, toast } from 'react-toastify';
+import { Zoom } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
-class App extends Component {
+import SearhBar from './searchBar/SearchBar';
+import ImageGallery from './image-gallery/ImageGallery';
+import LoadMoreButton from './button/Button';
+import { AppContainer } from './App.styled';
+import fetchApi from '../components/service/ApiService';
+import Spiner from './loader/Loader';
+import Modal from './modal/Modal';
+
+axios.defaults.baseURL = 'https://pixabay.com/api/';
+export default class App extends Component {
+  static propTypes = { searchQuery: PropTypes.string };
   state = {
-    contacts: [
-      { id: 'id-1', name: 'Rosie Simpson', number: '459-12-56' },
-      { id: 'id-2', name: 'Hermione Kline', number: '443-89-12' },
-      { id: 'id-3', name: 'Eden Clements', number: '645-17-79' },
-      { id: 'id-4', name: 'Annie Copeland', number: '227-91-26' },
-    ],
-    filter: '',
+    searchQuery: '',
+    images: [],
+    page: 1,
+    selectedImage: null,
+    alt: null,
+    status: 'idle',
+    error: null,
   };
+  totalHits = null;
 
-  addContact = ({ name, number }) => {
-    const normalizedName = name.toLowerCase();
+  async componentDidUpdate(_, prevState) {
+    const { page, searchQuery } = this.state;
+    if (prevState.searchQuery !== searchQuery || prevState.page !== page) {
+      this.setState({ status: 'pending' });
 
-    let isAdded = false;
-    this.state.contacts.find(el => {
-      if (el.name.toLowerCase() === normalizedName) {
-        alert(`${name} is already in contacts`);
-        isAdded = true;
+      try {
+        const imageData = await fetchApi(searchQuery, page);
+        this.totalHits = imageData.total;
+        const imagesHits = imageData.hits;
+        if (!imagesHits.length) {
+          toast.warning(
+            'No results were found for your search, please try something else.',
+            { transition: Zoom, position: 'top-center' }
+          );
+        }
+        this.setState(({ images }) => ({
+          images: [...images, ...imagesHits],
+          status: 'resolved',
+        }));
+
+        if (page > 1) {
+          const CARD_HEIGHT = 300; // preview image height
+          window.scrollBy({
+            top: CARD_HEIGHT * 2,
+            behavior: 'smooth',
+          });
+        }
+      } catch (error) {
+        toast.error(`Sorry something went wrong. ${error.message}`);
+        this.setState({ status: 'rejected' });
       }
-    });
-
-    if (isAdded) {
+    }
+  }
+  handleFormSubmit = searchQuery => {
+    if (this.state.searchQuery === searchQuery) {
       return;
     }
-    const contact = {
-      id: shortid.generate(),
-      name: name,
-      number: number,
-    };
+    this.resetState();
+    this.setState({ searchQuery });
+  };
+  handleSelectedImage = (largeImageUrl, tags) => {
+    this.setState({
+      selectedImage: largeImageUrl,
+      alt: tags,
+    });
+  };
+
+  resetState = () => {
+    this.setState({
+      searchQuery: '',
+      page: 1,
+      images: [],
+      selectedImage: null,
+      alt: null,
+      status: 'idle',
+    });
+  };
+
+  loadMore = () => {
     this.setState(prevState => ({
-      contacts: [...prevState.contacts, contact],
+      page: prevState.page + 1,
     }));
   };
 
-  changeFilter = e => {
-    this.setState({ filter: e.currentTarget.value });
-  };
-
-  getVisibleContacts = () => {
-    const { filter, contacts } = this.state;
-    const normalizedFilter = filter.toLowerCase();
-
-    return contacts.filter(contact =>
-      contact.name.toLowerCase().includes(normalizedFilter)
-    );
-  };
-
-  deleteContact = todoId => {
-    this.setState(prevState => ({
-      contacts: prevState.contacts.filter(contact => contact.id !== todoId),
-    }));
+  closeModal = () => {
+    this.setState({
+      selectedImage: null,
+    });
   };
 
   render() {
-    const { contacts, filter } = this.state;
-    const visibleContacts = this.getVisibleContacts();
-
+    const { images, status, selectedImage, alt, error } = this.state;
     return (
-      <div
-        style={{
-          // height: '100vh',
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-          flexDirection: 'column',
-          fontSize: 18,
-          // textTransform: 'uppercase',
-          color: '#010101',
-        }}
-      >
-        <h1>Phonebook</h1>
-        <ContactForm onSubmit={this.addContact} />
-
-        <h2 className={s.titleContacts}>Contacts</h2>
-        <div className={s.allContacts}>All contacts: {contacts.length}</div>
-        <Filter value={filter} onChange={this.changeFilter} />
-        <ContactList
-          contacts={visibleContacts}
-          onDeleteContact={this.deleteContact}
-        />
-      </div>
+      <AppContainer>
+        <SearhBar onSubmit={this.handleFormSubmit} />
+        <ToastContainer autoClose={3000} theme="colored" pauseOnHover />
+        {status === 'pending' && <Spiner />}
+        {error && (
+          <h1 style={{ color: 'orangered', textAlign: 'center' }}>
+            {error.message}
+          </h1>
+        )}
+        {images.length > 0 && (
+          <ImageGallery
+            images={images}
+            selectedImage={this.handleSelectedImage}
+          />
+        )}
+        {images.length > 0 && images.length !== this.totalHits && (
+          <LoadMoreButton onClick={this.loadMore} />
+        )}
+        {selectedImage && (
+          <Modal
+            selectedImage={selectedImage}
+            tags={alt}
+            onClose={this.closeModal}
+          />
+        )}
+      </AppContainer>
     );
   }
 }
-
-export default App;
